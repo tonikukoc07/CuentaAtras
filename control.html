@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <title>Panel de Control</title>
+    <style>
+        body{background:#0b1220;color:#fff;font-family:sans-serif;display:grid;place-items:center;min-height:100vh;margin:0}
+        .card{background:#111827;padding:25px;border-radius:18px;width:350px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.5)}
+        input{width:100%;padding:12px;margin:10px 0;border-radius:8px;border:none;box-sizing:border-box}
+        button{width:100%;padding:12px;margin:5px 0;border-radius:8px;border:none;cursor:pointer;font-weight:bold;text-transform:uppercase}
+        .start{background:#2563eb;color:#fff}
+        .pause{background:#374151;color:#fff}
+        .reset{background:#ef4444;color:#fff}
+        #preview{font-size:48px;margin:15px 0;font-weight:900;font-variant-numeric:tabular-nums}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>CONTROL REMOTO</h2>
+        <input id="title" type="text" placeholder="Título del marcador">
+        <input id="minutes" type="number" value="15" placeholder="Minutos">
+        <div id="preview">00:00</div>
+        <button class="start" id="btnStart">Iniciar</button>
+        <button class="pause" id="btnPause">Pausar</button>
+        <button class="reset" id="btnReset">Reset / Guardar</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, update, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        const conf = { databaseURL: "https://micontador-46836-default-rtdb.europe-west1.firebasedatabase.app/" };
+        const app = initializeApp(conf);
+        const db = getDatabase(app);
+        const dbRef = ref(db, '/');
+
+        function fmt(sec){
+            const m = Math.floor(sec/60);
+            const s = sec % 60;
+            return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        }
+
+        onValue(dbRef, (snap) => {
+            const st = snap.val();
+            if(!st) return;
+            let rem = st.running ? Math.max(0, Math.ceil((st.endTimeMs - Date.now())/1000)) : st.remaining;
+            document.getElementById("preview").textContent = fmt(rem);
+        });
+
+        document.getElementById("btnStart").onclick = () => {
+            const mins = parseInt(document.getElementById("minutes").value) || 15;
+            const title = document.getElementById("title").value;
+            // Calculamos el fin basándonos en el tiempo que quedaba
+            onValue(dbRef, (snap) => {
+                const current = snap.val();
+                const end = Date.now() + (current.remaining * 1000);
+                update(dbRef, { running: true, endTimeMs: end, title: title });
+            }, { onlyOnce: true });
+        };
+
+        document.getElementById("btnPause").onclick = () => {
+            onValue(dbRef, (snap) => {
+                const st = snap.val();
+                const rem = Math.max(0, Math.ceil((st.endTimeMs - Date.now())/1000));
+                update(dbRef, { running: false, remaining: rem });
+            }, { onlyOnce: true });
+        };
+
+        document.getElementById("btnReset").onclick = () => {
+            const mins = parseInt(document.getElementById("minutes").value) || 15;
+            update(dbRef, {
+                running: false,
+                duration: mins * 60,
+                remaining: mins * 60,
+                endTimeMs: 0,
+                title: document.getElementById("title").value
+            });
+        };
+    </script>
+</body>
+</html>
