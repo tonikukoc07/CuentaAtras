@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <style>
+        body{margin:0;background:transparent;display:grid;place-items:center;height:100vh;
+             font-family:system-ui,sans-serif;overflow:hidden}
+        .wrap{text-align:center}
+        #title{font-size:64px;font-weight:800;color:#fff;margin-bottom:18px;text-shadow:0 0 22px #000;text-transform:uppercase}
+        #timer{font-size:160px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums;text-shadow:0 0 26px #000}
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div id="title"></div>
+        <div id="timer">00:00</div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        const firebaseConfig = { databaseURL: "https://micontador-46836-default-rtdb.europe-west1.firebasedatabase.app/" };
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        function fmt(sec){
+            sec = Math.max(0, Math.floor(sec));
+            const m = Math.floor(sec/60);
+            const s = sec % 60;
+            return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        }
+
+        // Escucha cambios en la raíz de tu base de datos
+        onValue(ref(db, '/'), (snapshot) => {
+            const st = snapshot.val();
+            if(!st) return;
+
+            document.getElementById("title").textContent = st.title || "";
+            
+            if(window.timerInt) clearInterval(window.timerInt);
+            
+            const updateUI = () => {
+                let rem = st.remaining;
+                if(st.running === true){
+                    rem = Math.max(0, Math.ceil((st.endTimeMs - Date.now())/1000));
+                }
+                document.getElementById("timer").textContent = fmt(rem);
+            };
+
+            updateUI();
+            if(st.running === true) window.timerInt = setInterval(updateUI, 1000);
+        });
+    </script>
+</body>
+</html>
